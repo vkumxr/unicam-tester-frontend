@@ -17,19 +17,19 @@ export function VerifiedParameter({
   return (
     <div
       className={cn(
-        "flex items-start justify-between py-2 border-b border-border/30 last:border-0",
+        "flex items-center justify-between py-1.5",
         className
       )}
     >
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-mono text-foreground text-right">
+      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-mono text-foreground">
           {value || "—"}
         </span>
         {verified ? (
-          <Check className="w-4 h-4 text-success flex-shrink-0" />
+          <Check className="w-3 h-3 text-success flex-shrink-0" />
         ) : (
-          <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+          <AlertTriangle className="w-3 h-3 text-warning flex-shrink-0" />
         )}
       </div>
     </div>
@@ -40,18 +40,19 @@ interface ParameterSectionProps {
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  defaultOpen?: boolean;
 }
 
-export function ParameterSection({ title, icon, children }: ParameterSectionProps) {
+export function ParameterSection({ title, icon, children, defaultOpen = true }: ParameterSectionProps) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 pb-2 border-b border-border">
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 py-1.5 border-b border-border/50">
         <span className="text-muted-foreground">{icon}</span>
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+        <h3 className="text-[11px] font-medium text-foreground uppercase tracking-wider">
           {title}
         </h3>
       </div>
-      <div className="space-y-1">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }

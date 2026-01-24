@@ -7,7 +7,7 @@ import { TechnicalReport } from "@/components/camera/TechnicalReport";
 import { CustomCameraForm } from "@/components/camera/CustomCameraForm";
 import { SessionHistory } from "@/components/camera/SessionHistory";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { generatePDFReport } from "@/utils/pdfExport";
 import { generatePPTReport } from "@/utils/pptExport";
 import { CameraProfile } from "@/types/camera";
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 const Index = () => {
-  const { status, currentCamera, liveData, connect, disconnect, toggleConnection, refreshData } =
+  const { status, currentCamera, liveData, connect, disconnect, refreshData } =
     useConnectionSimulation();
 
   const {
@@ -56,133 +56,133 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 lg:p-6">
-      {/* Header */}
-      <header className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Camera className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Camera Analysis Lab</h1>
-              <p className="text-xs text-muted-foreground">Innovation Lab Tool</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <CustomCameraForm onSave={handleCustomCamera} />
-            <SessionHistory
-              sessions={sessions}
-              currentSessionId={currentSession?.id}
-              onLoadSession={loadSession}
-              onDeleteSession={deleteSession}
-            />
-          </div>
+      {/* Compact Header */}
+      <header className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Camera className="w-5 h-5 text-primary" />
+          <span className="text-sm font-medium text-foreground">Unicam Tester</span>
+          <Separator orientation="vertical" className="h-4 mx-2" />
+          <ConnectionStatusBadge
+            status={status}
+            cameraName={profile?.identification.sensorName}
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CustomCameraForm onSave={handleCustomCamera} />
+          <SessionHistory
+            sessions={sessions}
+            currentSessionId={currentSession?.id}
+            onLoadSession={loadSession}
+            onDeleteSession={deleteSession}
+          />
         </div>
       </header>
 
-      {/* Main Dashboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
-        {/* Left Panel: Live Analysis */}
-        <div className="flex flex-col gap-4">
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Connection Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ConnectionStatusBadge
-                status={status}
-                cameraName={profile?.identification.sensorName}
-              />
-              <div className="flex gap-2">
-                <Button
-                  onClick={isConnected ? disconnect : handleConnect}
-                  variant={isConnected ? "destructive" : "default"}
-                  className="flex-1 gap-2"
-                  disabled={status === "connecting"}
-                >
-                  {isConnected ? (
-                    <>
-                      <PowerOff className="w-4 h-4" />
-                      Disconnect
-                    </>
-                  ) : (
-                    <>
-                      <Power className="w-4 h-4" />
-                      Simulate Connect
-                    </>
-                  )}
-                </Button>
+      {/* Main Dashboard - Camera feed focused */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-100px)]">
+        {/* Left Panel: Camera Feed (Primary Focus) */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* Camera Preview - Large and prominent */}
+          <div className="flex-1 min-h-0">
+            <CameraPreview
+              isConnected={isConnected}
+              cameraName={profile?.identification.sensorName}
+            />
+          </div>
+
+          {/* Controls Row */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Primary Action */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={isConnected ? disconnect : handleConnect}
+                variant={isConnected ? "destructive" : "default"}
+                size="sm"
+                className="gap-1.5"
+                disabled={status === "connecting"}
+              >
+                {isConnected ? (
+                  <>
+                    <PowerOff className="w-3.5 h-3.5" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Power className="w-3.5 h-3.5" />
+                    Connect
+                  </>
+                )}
+              </Button>
+              {isConnected && (
                 <Button
                   onClick={refreshData}
-                  variant="outline"
-                  size="icon"
-                  disabled={!isConnected}
-                  title="Refresh Data"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <CameraPreview
-            isConnected={isConnected}
-            cameraName={profile?.identification.sensorName}
-          />
-
-          <LiveDataPanel liveData={liveData} isConnected={isConnected} />
-
-          {/* Actions */}
-          <Card className="bg-card/50 border-border/50 mt-auto">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={() => profile && generatePDFReport(profile)}
-                  variant="outline"
-                  className="gap-2"
-                  disabled={!profile}
-                >
-                  <FileText className="w-4 h-4" />
-                  Export PDF
-                </Button>
-                <Button
-                  onClick={() => profile && generatePPTReport(profile)}
-                  variant="outline"
-                  className="gap-2"
-                  disabled={!profile}
-                >
-                  <Presentation className="w-4 h-4" />
-                  Export PPT
-                </Button>
-                <Button
-                  onClick={() => saveSession()}
-                  variant="secondary"
-                  className="gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Save Session
-                </Button>
-                <Button
-                  onClick={clearCurrentSession}
                   variant="ghost"
-                  className="gap-2"
+                  size="sm"
+                  className="gap-1.5 text-muted-foreground"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Refresh
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+
+            {/* Secondary Actions */}
+            <div className="flex items-center gap-1.5">
+              <Button
+                onClick={() => profile && generatePDFReport(profile)}
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                disabled={!profile}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                PDF
+              </Button>
+              <Button
+                onClick={() => profile && generatePPTReport(profile)}
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                disabled={!profile}
+              >
+                <Presentation className="w-3.5 h-3.5" />
+                PPT
+              </Button>
+              <Separator orientation="vertical" className="h-4 mx-1" />
+              <Button
+                onClick={() => saveSession()}
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save
+              </Button>
+              <Button
+                onClick={clearCurrentSession}
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-destructive/70 hover:text-destructive"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          {/* Live Data - Compact */}
+          <LiveDataPanel liveData={liveData} isConnected={isConnected} />
         </div>
 
         {/* Right Panel: Technical Report */}
-        <div className="h-full">
+        <div className="h-full overflow-hidden bg-card/30 rounded p-4">
           {profile ? (
             <TechnicalReport profile={profile} />
           ) : (
-            <Card className="h-full flex items-center justify-center bg-card/50 border-border/50">
-              <p className="text-muted-foreground">No camera profile loaded</p>
-            </Card>
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Camera className="w-8 h-8 opacity-30" />
+              <span className="text-xs">No camera profile</span>
+            </div>
           )}
         </div>
       </div>
