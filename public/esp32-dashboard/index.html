@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unicam OV5640 Tester</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0d1117;--bg2:#161b22;--bg3:#1c2129;
+--fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
+--accent:#58a6ff;--green:#3fb950;--amber:#d29922;--red:#f85149;
+--mono:'Consolas','SF Mono','Menlo',monospace;
+--sans:-apple-system,'Segoe UI',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--fg);font:13px/1.4 var(--sans);overflow:hidden}
+
+/* Grid background */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+background-image:linear-gradient(rgba(88,166,255,.04) 1px,transparent 1px),
+linear-gradient(90deg,rgba(88,166,255,.04) 1px,transparent 1px);
+background-size:24px 24px}
+
+.app{position:relative;z-index:1;display:grid;height:100vh;
+grid-template-rows:40px 1fr 28px;grid-template-columns:1fr 320px;gap:0}
+
+/* Header */
+.hdr{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 12px;
+background:var(--bg2);border-bottom:1px solid var(--fg3)}
+.hdr .logo{font:bold 13px var(--mono);color:var(--accent);letter-spacing:1px}
+.hdr .sep{width:1px;height:16px;background:var(--fg3)}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.live{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+.status-dot.init{background:var(--amber);animation:pulse 1s infinite}
+.status-dot.off{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-text{font:11px var(--mono);color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}
+.hdr-right{margin-left:auto;display:flex;gap:6px}
+
+/* Buttons */
+.btn{font:11px var(--mono);padding:4px 10px;border:1px solid var(--fg3);border-radius:3px;
+background:var(--bg3);color:var(--fg2);cursor:pointer;text-transform:uppercase;letter-spacing:.5px;
+transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--fg)}
+.btn.primary{border-color:var(--accent);color:var(--accent)}
+.btn.primary:hover{background:var(--accent);color:var(--bg)}
+.btn.danger{border-color:var(--red);color:var(--red)}
+.btn.danger:hover{background:var(--red);color:#fff}
+
+/* Main feed */
+.feed{position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.feed img{max-width:100%;max-height:100%;object-fit:contain}
+.feed .empty{text-align:center;color:var(--fg3)}
+.feed .empty svg{width:48px;height:48px;margin-bottom:8px;opacity:.3}
+.feed .empty p{font:11px var(--mono)}
+
+/* Feed overlay */
+.overlay{position:absolute;inset:0;pointer-events:none}
+.overlay .corner{position:absolute;width:12px;height:12px;border-color:var(--green)}
+.overlay .corner.tl{top:8px;left:8px;border-left:1px solid;border-top:1px solid}
+.overlay .corner.tr{top:8px;right:8px;border-right:1px solid;border-top:1px solid}
+.overlay .corner.bl{bottom:8px;left:8px;border-left:1px solid;border-bottom:1px solid}
+.overlay .corner.br{bottom:8px;right:8px;border-right:1px solid;border-bottom:1px solid}
+.overlay .tag{position:absolute;font:10px var(--mono);color:var(--fg2);letter-spacing:.5px}
+.overlay .tag.tl{top:10px;left:24px}.overlay .tag.tr{top:10px;right:24px}
+.overlay .tag.bl{bottom:10px;left:24px}.overlay .tag.br{bottom:10px;right:24px}
+.overlay .tag .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);
+margin-right:4px;vertical-align:middle;box-shadow:0 0 4px var(--green)}
+
+/* Diagnostics panel */
+.diag{background:var(--bg2);border-left:1px solid var(--fg3);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--fg3);flex-shrink:0}
+.tab{flex:1;padding:8px 0;text-align:center;font:10px var(--mono);text-transform:uppercase;
+letter-spacing:.8px;color:var(--fg3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--fg2)}
+.tab-body{flex:1;overflow-y:auto;padding:8px 10px}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* Key-value rows */
+.kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.kv .k{font:10px var(--mono);color:var(--fg3);text-transform:uppercase;letter-spacing:.5px}
+.kv .v{font:11px var(--mono);color:var(--fg);text-align:right}
+.kv .v.green{color:var(--green)}.kv .v.amber{color:var(--amber)}.kv .v.red{color:var(--red)}
+.section-hdr{font:10px var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:1px;
+padding:10px 0 4px;border-bottom:1px solid rgba(88,166,255,.15);margin-bottom:2px}
+
+/* Log console */
+.log-bar{grid-column:1/-1;background:var(--bg2);border-top:1px solid var(--fg3);
+display:flex;align-items:center;padding:0 12px;gap:8px;overflow:hidden}
+.log-bar .log-label{font:10px var(--mono);color:var(--fg3);text-transform:uppercase;flex-shrink:0}
+.log-bar .log-line{font:11px var(--mono);color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-bar .log-time{font:10px var(--mono);color:var(--fg3);flex-shrink:0}
+
+/* Metrics highlight */
+.metric{text-align:center;padding:8px 4px}
+.metric .val{font:bold 20px var(--mono);color:var(--fg)}
+.metric .lbl{font:9px var(--mono);color:var(--fg3);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;
+background:var(--bg);border-radius:4px;padding:4px}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--fg3);border-radius:2px}
+
+@media(max-width:768px){
+.app{grid-template-columns:1fr;grid-template-rows:40px 50vh 1fr 28px}
+.diag{border-left:none;border-top:1px solid var(--fg3)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="hdr">
+    <span class="logo">UNICAM</span>
+    <div class="sep"></div>
+    <div class="status-dot off" id="statusDot"></div>
+    <span class="status-text" id="statusText">Disconnected</span>
+    <div class="hdr-right">
+      <button class="btn primary" id="btnConnect" onclick="toggleConnect()">Connect</button>
+      <button class="btn" onclick="capture()">Capture</button>
+      <button class="btn" onclick="exportLog()">Export</button>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div class="feed" id="feedArea">
+    <div class="empty" id="emptyState">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <p>Waiting for camera…</p>
+    </div>
+    <img id="streamImg" style="display:none" alt="Live">
+    <div class="overlay" id="feedOverlay" style="display:none">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <span class="tag tl"><span class="dot"></span>LIVE</span>
+      <span class="tag tr" id="olyCam">OV5640</span>
+      <span class="tag bl" id="olyRes">—</span>
+      <span class="tag br" id="olyFps">— FPS</span>
+    </div>
+  </div>
+
+  <!-- Diagnostics -->
+  <div class="diag">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab(0)">Info</div>
+      <div class="tab" onclick="showTab(1)">Stream</div>
+      <div class="tab" onclick="showTab(2)">Sensor</div>
+      <div class="tab" onclick="showTab(3)">Logs</div>
+    </div>
+    <div class="tab-body">
+      <!-- Tab 0: Camera Info -->
+      <div class="tab-content active" id="tab0">
+        <div class="section-hdr">Identification</div>
+        <div class="kv"><span class="k">Sensor</span><span class="v" id="infoSensor">—</span></div>
+        <div class="kv"><span class="k">Manufacturer</span><span class="v" id="infoMfr">—</span></div>
+        <div class="kv"><span class="k">Type</span><span class="v" id="infoType">—</span></div>
+        <div class="kv"><span class="k">Status</span><span class="v" id="infoStatus">—</span></div>
+        <div class="section-hdr">Optical</div>
+        <div class="kv"><span class="k">Aperture</span><span class="v" id="infoAperture">—</span></div>
+        <div class="kv"><span class="k">Focal Length</span><span class="v" id="infoFocal">—</span></div>
+        <div class="kv"><span class="k">FOV</span><span class="v" id="infoFov">—</span></div>
+        <div class="section-hdr">Interface</div>
+        <div class="kv"><span class="k">Data</span><span class="v" id="infoInterface">—</span></div>
+        <div class="kv"><span class="k">Clock</span><span class="v" id="infoClock">—</span></div>
+        <div class="kv"><span class="k">Power</span><span class="v" id="infoPower">—</span></div>
+      </div>
+      <!-- Tab 1: Stream Metrics -->
+      <div class="tab-content" id="tab1">
+        <div class="metrics-row">
+          <div class="metric"><div class="val" id="mFps">—</div><div class="lbl">FPS</div></div>
+          <div class="metric"><div class="val" id="mLatency">—</div><div class="lbl">Latency</div></div>
+          <div class="metric"><div class="val" id="mUptime">—</div><div class="lbl">Uptime</div></div>
+        </div>
+        <div class="section-hdr">Stream</div>
+        <div class="kv"><span class="k">Resolution</span><span class="v" id="mRes">—</span></div>
+        <div class="kv"><span class="k">Format</span><span class="v">MJPEG</span></div>
+        <div class="kv"><span class="k">Bandwidth</span><span class="v" id="mBw">—</span></div>
+        <div class="kv"><span class="k">Frames</span><span class="v" id="mFrames">0</span></div>
+        <div class="kv"><span class="k">Dropped</span><span class="v" id="mDropped">0</span></div>
+        <div class="section-hdr">Connection</div>
+        <div class="kv"><span class="k">Host</span><span class="v" id="mHost">—</span></div>
+        <div class="kv"><span class="k">Signal</span><span class="v" id="mSignal">—</span></div>
+      </div>
+      <!-- Tab 2: Sensor Data -->
+      <div class="tab-content" id="tab2">
+        <div class="section-hdr">Sensor Specs</div>
+        <div class="kv"><span class="k">Resolution</span><span class="v" id="senRes">—</span></div>
+        <div class="kv"><span class="k">Megapixels</span><span class="v" id="senMp">—</span></div>
+        <div class="kv"><span class="k">Pixel Size</span><span class="v" id="senPx">—</span></div>
+        <div class="kv"><span class="k">CFA</span><span class="v" id="senCfa">—</span></div>
+        <div class="kv"><span class="k">Shutter</span><span class="v" id="senShutter">—</span></div>
+        <div class="section-hdr">Working Principle</div>
+        <div id="senPrinciples" style="padding:4px 0"></div>
+        <div class="section-hdr">Settings</div>
+        <div class="kv"><span class="k">Brightness</span><span class="v"><input type="range" min="-2" max="2" value="0" id="setBright" onchange="updateSetting('brightness',this.value)" style="width:80px"></span></div>
+        <div class="kv"><span class="k">Contrast</span><span class="v"><input type="range" min="-2" max="2" value="0" id="setContrast" onchange="updateSetting('contrast',this.value)" style="width:80px"></span></div>
+        <div class="kv"><span class="k">Resolution</span><span class="v">
+          <select id="setRes" onchange="updateSetting('framesize',this.value)" style="font:11px var(--mono);background:var(--bg);color:var(--fg);border:1px solid var(--fg3);padding:2px 4px;border-radius:2px">
+            <option value="10">UXGA 1600×1200</option>
+            <option value="9">SXGA 1280×1024</option>
+            <option value="8" selected>XGA 1024×768</option>
+            <option value="7">SVGA 800×600</option>
+            <option value="5">VGA 640×480</option>
+            <option value="4">CIF 400×296</option>
+            <option value="3">QVGA 320×240</option>
+          </select>
+        </span></div>
+      </div>
+      <!-- Tab 3: Logs -->
+      <div class="tab-content" id="tab3">
+        <div id="logArea" style="font:11px var(--mono);color:var(--fg2);white-space:pre-wrap;word-break:break-all"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom log bar -->
+  <div class="log-bar">
+    <span class="log-label">Log</span>
+    <span class="log-time" id="logTime">—</span>
+    <span class="log-line" id="logLine">Ready</span>
+  </div>
+</div>
+
+<script>
+// Config
+var HOST='http://esp32cam.local';
+var connected=false,streamActive=false,startTime=0,frameCount=0,droppedFrames=0;
+var pollTimer=null,fpsTimer=null,lastFrameTime=0,currentFps=0;
+var logs=[];
+
+function log(msg){
+  var t=new Date().toLocaleTimeString();
+  logs.push('['+t+'] '+msg);
+  if(logs.length>200)logs.shift();
+  document.getElementById('logTime').textContent=t;
+  document.getElementById('logLine').textContent=msg;
+  var la=document.getElementById('logArea');
+  la.textContent=logs.join('\n');
+  la.scrollTop=la.scrollHeight;
+}
+
+function setStatus(state,text){
+  var dot=document.getElementById('statusDot');
+  var txt=document.getElementById('statusText');
+  dot.className='status-dot '+state;
+  txt.textContent=text;
+}
+
+function showTab(n){
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',i===n)});
+  document.querySelectorAll('.tab-content').forEach(function(t,i){t.classList.toggle('active',i===n)});
+}
+
+function toggleConnect(){
+  if(connected){disconnect();}else{doConnect();}
+}
+
+function doConnect(){
+  setStatus('init','Initializing…');
+  log('Connecting to '+HOST+'…');
+  document.getElementById('btnConnect').textContent='…';
+  
+  fetch(HOST+'/status',{mode:'cors',signal:AbortSignal.timeout(5000)})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    connected=true;
+    startTime=Date.now();
+    log('Camera detected: '+(d.sensor||'OV5640'));
+    populateInfo(d);
+    startStream();
+    startPolling();
+    setStatus('live','Connected');
+    document.getElementById('btnConnect').textContent='Disconnect';
+    document.getElementById('btnConnect').classList.remove('primary');
+    document.getElementById('btnConnect').classList.add('danger');
+  })
+  .catch(function(e){
+    log('Connection failed: '+e.message);
+    setStatus('off','Error');
+    document.getElementById('btnConnect').textContent='Retry';
+    // Fallback: try stream directly (some firmware only has /stream)
+    log('Trying direct stream…');
+    startStream();
+  });
+}
+
+function disconnect(){
+  connected=false;streamActive=false;
+  clearInterval(pollTimer);clearInterval(fpsTimer);
+  var img=document.getElementById('streamImg');
+  img.src='';img.style.display='none';
+  document.getElementById('emptyState').style.display='';
+  document.getElementById('feedOverlay').style.display='none';
+  setStatus('off','Disconnected');
+  document.getElementById('btnConnect').textContent='Connect';
+  document.getElementById('btnConnect').classList.add('primary');
+  document.getElementById('btnConnect').classList.remove('danger');
+  log('Disconnected');
+}
+
+function populateInfo(d){
+  var s=function(id,v){document.getElementById(id).textContent=v||'—'};
+  s('infoSensor',d.sensor||'OV5640');
+  s('infoMfr',d.manufacturer||'OmniVision');
+  s('infoType',d.sensor_type||'CMOS');
+  s('infoStatus','Connected');
+  document.getElementById('infoStatus').classList.add('green');
+  s('infoAperture',d.aperture||'f/2.4');
+  s('infoFocal',d.focal_length||'3.56mm');
+  s('infoFov',d.fov||'68.2°');
+  s('infoInterface',d.data_interface||'MIPI CSI-2 / DVP');
+  s('infoClock',d.clocking||'XCLK 24MHz');
+  s('infoPower',d.power||'2.8V / 1.5V');
+  s('senRes',d.resolution||'2592×1944');
+  s('senMp',d.megapixels||'5.0 MP');
+  s('senPx',d.pixel_size||'1.4µm');
+  s('senCfa',d.cfa||'Bayer RGGB');
+  s('senShutter',d.shutter||'Rolling');
+  s('olyCam',d.sensor||'OV5640');
+  // Populate working principles
+  var wp=document.getElementById('senPrinciples');
+  var facts=d.principles||['Rolling shutter readout','Bayer RGGB pattern','On-chip 10-bit ADC','ISP with AWB/AE/AF','MIPI CSI-2 & DVP output','Embedded 1.5V LDO'];
+  wp.innerHTML=facts.map(function(f){return '<div class="kv"><span class="k">•</span><span class="v">'+f+'</span></div>'}).join('');
+}
+
+function startStream(){
+  var img=document.getElementById('streamImg');
+  var url=HOST+':81/stream';
+  img.onerror=function(){
+    if(connected){
+      droppedFrames++;
+      log('Stream error — reconnecting…');
+      setTimeout(startStream,2000);
+    }
+  };
+  img.onload=function(){
+    if(!streamActive){
+      streamActive=true;
+      document.getElementById('emptyState').style.display='none';
+      img.style.display='';
+      document.getElementById('feedOverlay').style.display='';
+      log('Stream active');
+    }
+    frameCount++;
+    lastFrameTime=Date.now();
+  };
+  img.src=url;
+}
+
+function startPolling(){
+  // FPS counter
+  var prevCount=0;
+  fpsTimer=setInterval(function(){
+    currentFps=frameCount-prevCount;
+    prevCount=frameCount;
+    document.getElementById('olyFps').textContent=currentFps+' FPS';
+    document.getElementById('mFps').textContent=currentFps;
+    document.getElementById('mFrames').textContent=frameCount;
+    document.getElementById('mDropped').textContent=droppedFrames;
+    // Uptime
+    var up=Math.floor((Date.now()-startTime)/1000);
+    var m=Math.floor(up/60),s=up%60;
+    document.getElementById('mUptime').textContent=m+'m'+s+'s';
+    // Latency estimate
+    if(lastFrameTime){
+      var lat=Date.now()-lastFrameTime;
+      document.getElementById('mLatency').textContent=Math.min(lat,999)+'ms';
+    }
+  },1000);
+
+  // Poll status
+  pollTimer=setInterval(function(){
+    fetch(HOST+'/status',{mode:'cors',signal:AbortSignal.timeout(3000)})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.resolution)document.getElementById('olyRes').textContent=d.resolution;
+      if(d.rssi)document.getElementById('mSignal').textContent=d.rssi+'dBm';
+    }).catch(function(){});
+  },5000);
+
+  document.getElementById('mHost').textContent=HOST.replace('http://','');
+}
+
+function capture(){
+  if(!connected){log('Not connected');return;}
+  log('Capturing…');
+  var a=document.createElement('a');
+  a.href=HOST+'/capture';a.download='capture_'+Date.now()+'.jpg';
+  a.click();
+  log('Capture saved');
+}
+
+function updateSetting(key,val){
+  if(!connected){log('Not connected');return;}
+  log('Setting '+key+'='+val);
+  var fd=new FormData();fd.append('var',key);fd.append('val',val);
+  fetch(HOST+'/control',{method:'POST',body:fd,mode:'cors'})
+  .then(function(){log(key+' updated')})
+  .catch(function(e){log('Setting failed: '+e.message)});
+}
+
+function exportLog(){
+  var blob=new Blob([logs.join('\n')],{type:'text/plain'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='unicam_log_'+Date.now()+'.txt';a.click();
+  log('Log exported');
+}
+
+log('Unicam OV5640 Tester ready');
+log('Host: '+HOST);
+</script>
+</body>
+</html>
